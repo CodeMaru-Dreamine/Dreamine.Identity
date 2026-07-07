@@ -225,11 +225,36 @@ internal static class AuthEndpoints
             return "/";
         }
 
-        // Open-redirect 방지: 반드시 로컬 경로여야 함
-        return returnUrl.StartsWith("/", StringComparison.Ordinal)
-               && !returnUrl.StartsWith("//", StringComparison.Ordinal)
-            ? returnUrl
-            : "/";
+        // Open-redirect 방지:
+        // - 같은 앱 내부 이동은 로컬 경로만 허용
+        // - 중앙 로그인 포털에서 서브 서비스로 돌아갈 수 있도록 codemaru.co.kr 계열만 절대 URL 허용
+        if (returnUrl.StartsWith("/", StringComparison.Ordinal)
+            && !returnUrl.StartsWith("//", StringComparison.Ordinal))
+        {
+            return returnUrl;
+        }
+
+        if (!Uri.TryCreate(returnUrl, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("https" or "http"))
+        {
+            return "/";
+        }
+
+        return IsAllowedReturnHost(uri.Host) ? uri.ToString() : "/";
+    }
+
+    private static bool IsAllowedReturnHost(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            return false;
+        }
+
+        return string.Equals(host, "codemaru.co.kr", StringComparison.OrdinalIgnoreCase)
+               || host.EndsWith(".codemaru.co.kr", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task SignInAsync(HttpContext http, AuthUser user)
