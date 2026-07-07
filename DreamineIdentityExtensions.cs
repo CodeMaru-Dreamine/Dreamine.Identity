@@ -2,7 +2,9 @@ using System.Security.Claims;
 using AspNet.Security.OAuth.Naver;
 using Dreamine.Database.Abstractions;
 using Dreamine.Database.Sqlite;
+#if WINDOWS
 using Dreamine.Hybrid.Wpf.Hosting;
+#endif
 using Dreamine.Identity.Internal;
 using Dreamine.Identity.Options;
 using Microsoft.AspNetCore.Authentication;
@@ -13,6 +15,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -50,6 +53,7 @@ public static class DreamineIdentityExtensions
         return services;
     }
 
+#if WINDOWS
     /// <summary>
     /// \brief Blazor Server 호스트 옵션에 Dreamine OAuth 로그인 인프라를 통합합니다.
     /// </summary>
@@ -105,6 +109,48 @@ public static class DreamineIdentityExtensions
         };
 
         return options;
+    }
+#endif
+
+    /// <summary>
+    /// \brief 일반 ASP.NET Core 웹앱에 Dreamine Identity 공유 쿠키 인증을 등록합니다.
+    /// </summary>
+    /// <remarks>
+    /// WPF 호스트가 아닌 순수 웹앱에서 CodeMaru 중앙 로그인 쿠키를 읽어야 할 때 사용합니다.
+    /// 로그인/계정 화면은 중앙 포털 링크를 사용하고, 이 앱은 같은 쿠키와 DataProtection 키로
+    /// 인증 상태만 공유합니다.
+    /// </remarks>
+    public static IServiceCollection AddDreamineIdentityWeb(
+        this IServiceCollection services,
+        AuthOptions authOptions,
+        string databasePath)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(authOptions);
+        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
+
+        RegisterAuthServices(services, authOptions, databasePath);
+        services.Configure<ForwardedHeadersOptions>(forwarded =>
+        {
+            forwarded.ForwardedHeaders =
+                ForwardedHeaders.XForwardedFor |
+                ForwardedHeaders.XForwardedProto |
+                ForwardedHeaders.XForwardedHost;
+            forwarded.KnownNetworks.Clear();
+            forwarded.KnownProxies.Clear();
+        });
+
+        return services;
+    }
+
+    /// <summary>
+    /// \brief Dreamine Identity의 로컬 로그인/계정 엔드포인트를 현재 웹앱에도 매핑합니다.
+    /// </summary>
+    public static IEndpointRouteBuilder MapDreamineIdentityEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        endpoints.MapAuthEndpoints();
+        return endpoints;
     }
 
     private static void RegisterAuthServices(

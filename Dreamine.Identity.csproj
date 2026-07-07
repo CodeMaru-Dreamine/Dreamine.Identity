@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows7.0</TargetFramework>
+    <TargetFrameworks>net8.0;net8.0-windows7.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>Dreamine.Identity</RootNamespace>
@@ -12,7 +12,7 @@
     <ProjectReference Include="..\Database.Abstractions\Dreamine.Database.Abstractions.csproj" />
     <ProjectReference Include="..\Database.Core\Dreamine.Database.Core.csproj" />
     <ProjectReference Include="..\Database.Sqlite\Dreamine.Database.Sqlite.csproj" />
-    <ProjectReference Include="..\Hybrid.Wpf\Dreamine.Hybrid.Wpf.csproj" />
+    <ProjectReference Include="..\Hybrid.Wpf\Dreamine.Hybrid.Wpf.csproj" Condition="'$(TargetFramework)' == 'net8.0-windows7.0'" />
   </ItemGroup>
 
   <ItemGroup>
