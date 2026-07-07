@@ -44,9 +44,17 @@ internal static class AuthEndpoints
             await HandleSignupAsync(http, userStore, string.Empty).ConfigureAwait(false));
 
         endpoints.MapGet("/signin/google", (HttpContext http, string? returnUrl) =>
-            Results.Challenge(
-                new AuthenticationProperties { RedirectUri = SafeReturnUrl(returnUrl) },
-                new[] { GoogleDefaults.AuthenticationScheme }));
+        {
+            var safeReturnUrl = SafeReturnUrl(returnUrl);
+            if (IsEmbeddedMobileBrowser(http.Request.Headers.UserAgent.ToString()))
+            {
+                return Results.Redirect($"/_identity/login?returnUrl={Url(safeReturnUrl)}&error={Url("Google 로그인은 카카오톡/네이버앱 같은 앱 내부 브라우저에서 차단됩니다. 오른쪽 위 메뉴에서 '브라우저로 열기'를 선택한 뒤 다시 시도해 주세요. Naver/Kakao 로그인은 현재 화면에서도 사용할 수 있습니다.")}");
+            }
+
+            return Results.Challenge(
+                new AuthenticationProperties { RedirectUri = safeReturnUrl },
+                new[] { GoogleDefaults.AuthenticationScheme });
+        });
 
         endpoints.MapGet("/signin/naver", (HttpContext http, string? returnUrl) =>
             Results.Challenge(
@@ -371,6 +379,43 @@ internal static class AuthEndpoints
                 .social.google { border: 1px solid #ef4444; color: #f8fafc; }
                 .social.naver { border: 1px solid #10b981; color: #f8fafc; }
                 .social.kakao { border: 1px solid #facc15; color: #fde047; }
+                .browser-warning {
+                  display: none;
+                  margin: 0 0 12px;
+                  padding: 12px;
+                  border: 1px solid rgba(250, 204, 21, .38);
+                  border-radius: 8px;
+                  background: rgba(250, 204, 21, .10);
+                  color: #fde68a;
+                  font-size: 13px;
+                  line-height: 1.55;
+                }
+                .browser-warning strong { color: #fef3c7; }
+                body.embedded-browser .browser-warning { display: block; }
+                .external-browser-actions {
+                  display: none;
+                  grid-template-columns: 1fr 1fr;
+                  gap: 8px;
+                  margin-top: 10px;
+                }
+                body.embedded-browser .external-browser-actions { display: grid; }
+                .external-open {
+                  display: flex;
+                  min-height: 38px;
+                  align-items: center;
+                  justify-content: center;
+                  padding: 8px 10px;
+                  border: 1px solid rgba(147, 197, 253, .35);
+                  border-radius: 6px;
+                  color: #bfdbfe;
+                  font-size: 13px;
+                  font-weight: 700;
+                  text-decoration: none;
+                }
+                body.embedded-browser .social.google {
+                  opacity: .55;
+                  border-color: rgba(239, 68, 68, .35);
+                }
                 .switch { margin-top: 16px; color: #93c5fd; font-weight: 600; }
                 .message, .error {
                   padding: 10px 12px;
@@ -432,12 +477,50 @@ internal static class AuthEndpoints
                 </form>
                 <a class="switch" href="{{switchHref}}">{{Html(switchText)}}</a>
                 <div class="divider">또는</div>
+                <div class="browser-warning">
+                  <strong>Google 로그인 안내</strong><br />
+                  지금 화면이 앱 내부 브라우저라면 Google 로그인이 차단될 수 있습니다.
+                  오른쪽 위 메뉴에서 <strong>브라우저로 열기</strong>를 선택한 뒤 Google 로그인을 다시 시도해 주세요.
+                  <div class="external-browser-actions">
+                    <a class="external-open" id="openChrome" href="#">Chrome으로 열기</a>
+                    <a class="external-open" id="openSamsung" href="#">삼성인터넷으로 열기</a>
+                  </div>
+                </div>
                 <div class="socials">
-                  <a class="social google" href="/signin/google?returnUrl={{Url(returnUrl)}}">G Google</a>
+                  <a class="social google" id="googleLoginLink" href="/signin/google?returnUrl={{Url(returnUrl)}}">G Google</a>
                   <a class="social naver" href="/signin/naver?returnUrl={{Url(returnUrl)}}">N Naver</a>
                   <a class="social kakao" href="/signin/kakao?returnUrl={{Url(returnUrl)}}">Kakao</a>
                 </div>
               </main>
+              <script>
+                (function () {
+                  var ua = navigator.userAgent || "";
+                  var isEmbedded =
+                    /KAKAOTALK|NAVER\(inapp|FBAN|FBAV|Instagram|Line\//i.test(ua) ||
+                    (/\bwv\b/i.test(ua) && /Android/i.test(ua));
+                  if (!isEmbedded) return;
+
+                  document.body.classList.add("embedded-browser");
+                  var current = window.location.href;
+                  var withoutScheme = current.replace(/^https?:\/\//i, "");
+                  var chrome = document.getElementById("openChrome");
+                  var samsung = document.getElementById("openSamsung");
+                  if (chrome) {
+                    chrome.href = "intent://" + withoutScheme + "#Intent;scheme=https;package=com.android.chrome;end";
+                  }
+                  if (samsung) {
+                    samsung.href = "intent://" + withoutScheme + "#Intent;scheme=https;package=com.sec.android.app.sbrowser;end";
+                  }
+
+                  var google = document.getElementById("googleLoginLink");
+                  if (!google) return;
+
+                  google.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    alert("Google 로그인은 현재 앱 내부 브라우저에서 차단될 수 있습니다. 오른쪽 위 메뉴에서 '브라우저로 열기'를 선택한 뒤 다시 시도해 주세요.");
+                  });
+                })();
+              </script>
             </body>
             </html>
             """);
@@ -627,4 +710,21 @@ internal static class AuthEndpoints
     private static string Html(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
 
     private static string Url(string? value) => Uri.EscapeDataString(value ?? string.Empty);
+
+    private static bool IsEmbeddedMobileBrowser(string userAgent)
+    {
+        if (string.IsNullOrWhiteSpace(userAgent))
+        {
+            return false;
+        }
+
+        return userAgent.Contains("KAKAOTALK", StringComparison.OrdinalIgnoreCase)
+               || userAgent.Contains("NAVER(inapp", StringComparison.OrdinalIgnoreCase)
+               || userAgent.Contains("FBAN", StringComparison.OrdinalIgnoreCase)
+               || userAgent.Contains("FBAV", StringComparison.OrdinalIgnoreCase)
+               || userAgent.Contains("Instagram", StringComparison.OrdinalIgnoreCase)
+               || userAgent.Contains("Line/", StringComparison.OrdinalIgnoreCase)
+               || (userAgent.Contains("; wv)", StringComparison.OrdinalIgnoreCase)
+                   && userAgent.Contains("Android", StringComparison.OrdinalIgnoreCase));
+    }
 }
