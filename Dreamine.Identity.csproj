@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Dreamine.Identity</RootNamespace>
+    <Description>Dreamine 계열 앱에서 공유하는 OAuth 로그인, User 저장소, 인증 엔드포인트 라이브러리.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Database.Abstractions\Dreamine.Database.Abstractions.csproj" />
+    <ProjectReference Include="..\Database.Core\Dreamine.Database.Core.csproj" />
+    <ProjectReference Include="..\Database.Sqlite\Dreamine.Database.Sqlite.csproj" />
+    <ProjectReference Include="..\Hybrid.Wpf\Dreamine.Hybrid.Wpf.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" />
+    <PackageReference Include="AspNet.Security.OAuth.Naver" />
+    <PackageReference Include="AspNet.Security.OAuth.KakaoTalk" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>
