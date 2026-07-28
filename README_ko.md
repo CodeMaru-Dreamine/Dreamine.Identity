@@ -8,6 +8,10 @@
 ![.NET](https://img.shields.io/badge/.NET-8-512BD4)
 [![NuGet](https://img.shields.io/nuget/v/Dreamine.Identity.svg)](https://www.nuget.org/packages/Dreamine.Identity)
 [![다운로드](https://img.shields.io/nuget/dt/Dreamine.Identity.svg)](https://www.nuget.org/packages/Dreamine.Identity)
+[![문서](https://img.shields.io/badge/%F0%9F%93%96%20%EB%AC%B8%EC%84%9C-dreamine.kr-49B2FF.svg)](https://dreamine.kr/libraries?lang=ko)
+[![가이드](https://img.shields.io/badge/%F0%9F%93%98%20%EA%B0%80%EC%9D%B4%EB%93%9C-dreamine.kr-49B2FF.svg)](https://dreamine.kr/guide?lang=ko)
+[![실습장](https://img.shields.io/badge/%F0%9F%8E%AE%20%EC%8B%A4%EC%8A%B5%EC%9E%A5-dreamine.kr-49B2FF.svg)](https://dreamine.kr/playground?lang=ko)
+[![책](https://img.shields.io/badge/%F0%9F%93%96%20%EC%B1%85-%EC%8B%A4%EC%A0%84%20MVVM%20%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98-000000.svg)](https://bookk.co.kr/bookStore/69c0f1b41461ec1ae849a0f6)
 
 Dreamine 및 CodeMaru 웹 애플리케이션에서 공유하는 계정/인증 인프라 라이브러리입니다.
 
