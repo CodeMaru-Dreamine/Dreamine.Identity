@@ -6,6 +6,19 @@
     <Nullable>enable</Nullable>
     <RootNamespace>Dreamine.Identity</RootNamespace>
     <Description>Dreamine 계열 앱에서 공유하는 OAuth 로그인, User 저장소, 인증 엔드포인트 라이브러리.</Description>
+    <PackageId>Dreamine.Identity</PackageId>
+    <Version>1.0.1</Version>
+    <Authors>Dreamine Core Team</Authors>
+    <Company>CodeMaru-Dreamine</Company>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/CodeMaru-Dreamine/Dreamine.Identity</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/CodeMaru-Dreamine/Dreamine.Identity</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>dreamine;identity;authentication;oauth;sqlite;blazor;wpf</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,6 +37,11 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="tests\**\*.cs" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
