@@ -1,0 +1,173 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SONAR_PROJECT_KEY: CodeMaru-Dreamine_Dreamine.Identity
+  SONAR_ORGANIZATION: codemaru-dreamine
+  SONAR_PROJECT_VERSION: 1.0.1
+  SONAR_SCANNER_VERSION: 11.2.1
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+jobs:
+  build-test-analyze:
+    name: Build, test, and analyze
+    runs-on: windows-2025
+
+    steps:
+      - name: Checkout Identity
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          path: src/Identity
+          fetch-depth: 0
+
+      - name: Checkout Database.Abstractions dependency
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: CodeMaru-Dreamine/Dreamine.Database.Abstractions
+          path: src/Database.Abstractions
+          fetch-depth: 0
+
+      - name: Checkout Database.Core dependency
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: CodeMaru-Dreamine/Dreamine.Database.Core
+          path: src/Database.Core
+          fetch-depth: 0
+
+      - name: Checkout Database.Sqlite dependency
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: CodeMaru-Dreamine/Dreamine.Database.Sqlite
+          path: src/Database.Sqlite
+          fetch-depth: 0
+
+      - name: Checkout Hybrid dependency
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: CodeMaru-Dreamine/Dreamine.Hybrid
+          path: src/Hybrid
+          fetch-depth: 0
+
+      - name: Checkout Hybrid.Wpf dependency
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: CodeMaru-Dreamine/Dreamine.Hybrid.Wpf
+          path: src/Hybrid.Wpf
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Define standalone Hybrid dependency versions
+        shell: pwsh
+        run: |
+          @'
+          <Project>
+            <PropertyGroup>
+              <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="8.0.100" />
+              <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.3719.77" />
+            </ItemGroup>
+          </Project>
+          '@ | Set-Content -Encoding utf8 "src/Directory.Packages.props"
+
+      - name: Install SonarScanner for .NET
+        if: >-
+          env.SONAR_TOKEN != '' &&
+          (github.ref == 'refs/heads/main' ||
+           (github.event_name == 'pull_request' &&
+            github.actor != 'dependabot[bot]' &&
+            github.event.pull_request.head.repo.full_name == github.repository))
+        shell: pwsh
+        run: |
+          dotnet tool install dotnet-sonarscanner `
+            --tool-path "$env:RUNNER_TEMP\sonar-scanner" `
+            --version "$env:SONAR_SCANNER_VERSION"
+
+      - name: Restore
+        shell: pwsh
+        run: |
+          dotnet restore `
+            "src/Identity/tests/Dreamine.Identity.Tests/Dreamine.Identity.Tests.csproj"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          dotnet restore "src/Identity/Dreamine.Identity.csproj"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Begin SonarCloud analysis
+        if: >-
+          env.SONAR_TOKEN != '' &&
+          (github.ref == 'refs/heads/main' ||
+           (github.event_name == 'pull_request' &&
+            github.actor != 'dependabot[bot]' &&
+            github.event.pull_request.head.repo.full_name == github.repository))
+        shell: pwsh
+        run: |
+          $scanner = Join-Path $env:RUNNER_TEMP "sonar-scanner\dotnet-sonarscanner.exe"
+          $projectBaseDir = Join-Path $env:GITHUB_WORKSPACE "src\Identity"
+          & $scanner begin `
+            "/k:$env:SONAR_PROJECT_KEY" `
+            "/o:$env:SONAR_ORGANIZATION" `
+            "/v:$env:SONAR_PROJECT_VERSION" `
+            "/d:sonar.token=$env:SONAR_TOKEN" `
+            "/d:sonar.projectBaseDir=$projectBaseDir" `
+            "/d:sonar.scm.provider=git" `
+            "/d:sonar.sourceEncoding=UTF-8" `
+            "/d:sonar.qualitygate.wait=true" `
+            "/d:sonar.qualitygate.timeout=300" `
+            "/d:sonar.cs.opencover.reportsPaths=$env:RUNNER_TEMP\TestResults\**\coverage.opencover.xml" `
+            "/d:sonar.cs.vstest.reportsPaths=$env:RUNNER_TEMP\TestResults\**\*.trx" `
+            "/d:sonar.exclusions=**/bin/**,**/obj/**,**/TestResults/**,**/*.png" `
+            "/d:sonar.coverage.exclusions=tests/**" `
+            "/d:sonar.cpd.exclusions=tests/**"
+
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build and test
+        shell: pwsh
+        run: |
+          dotnet test `
+            "src/Identity/tests/Dreamine.Identity.Tests/Dreamine.Identity.Tests.csproj" `
+            --no-restore `
+            --configuration Release `
+            -m:1 `
+            --verbosity minimal `
+            --collect:"XPlat Code Coverage" `
+            --settings "src/Identity/.github/coverlet.runsettings" `
+            --results-directory "$env:RUNNER_TEMP\TestResults" `
+            --logger "trx;LogFileName=identity.trx"
+
+      - name: Pack
+        run: >-
+          dotnet pack
+          "src/Identity/Dreamine.Identity.csproj"
+          --no-restore
+          --configuration Release
+          --output "artifacts/packages"
+
+      - name: End SonarCloud analysis
+        if: >-
+          success() &&
+          env.SONAR_TOKEN != '' &&
+          (github.ref == 'refs/heads/main' ||
+           (github.event_name == 'pull_request' &&
+            github.actor != 'dependabot[bot]' &&
+            github.event.pull_request.head.repo.full_name == github.repository))
+        shell: pwsh
+        run: |
+          $scanner = Join-Path $env:RUNNER_TEMP "sonar-scanner\dotnet-sonarscanner.exe"
+          & $scanner end "/d:sonar.token=$env:SONAR_TOKEN"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

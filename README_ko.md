@@ -1,10 +1,19 @@
 # Dreamine.Identity
 
+[![CI](https://github.com/CodeMaru-Dreamine/Dreamine.Identity/actions/workflows/ci.yml/badge.svg)](https://github.com/CodeMaru-Dreamine/Dreamine.Identity/actions/workflows/ci.yml)
+[![품질 게이트](https://sonarcloud.io/api/project_badges/measure?project=CodeMaru-Dreamine_Dreamine.Identity&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=CodeMaru-Dreamine_Dreamine.Identity)
+[![보안 등급](https://sonarcloud.io/api/project_badges/measure?project=CodeMaru-Dreamine_Dreamine.Identity&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=CodeMaru-Dreamine_Dreamine.Identity)
+[![테스트 커버리지](https://sonarcloud.io/api/project_badges/measure?project=CodeMaru-Dreamine_Dreamine.Identity&metric=coverage)](https://sonarcloud.io/summary/new_code?id=CodeMaru-Dreamine_Dreamine.Identity)
+[![라이선스](https://img.shields.io/github/license/CodeMaru-Dreamine/Dreamine.Identity)](./LICENSE)
+![.NET](https://img.shields.io/badge/.NET-8-512BD4)
+[![NuGet](https://img.shields.io/nuget/v/Dreamine.Identity.svg)](https://www.nuget.org/packages/Dreamine.Identity)
+[![다운로드](https://img.shields.io/nuget/dt/Dreamine.Identity.svg)](https://www.nuget.org/packages/Dreamine.Identity)
+
 Dreamine 및 CodeMaru 웹 애플리케이션에서 공유하는 계정/인증 인프라 라이브러리입니다.
 
 `Dreamine.Identity`는 이메일/비밀번호 계정, OAuth 로그인, SQLite 기반 사용자 저장소, 서브도메인 공유 인증 쿠키, 기본 로그인/계정 페이지를 제공합니다.
 
-[English documentation](./README.md)
+[영문 문서](./README.md)
 
 ---
 
@@ -239,6 +248,7 @@ OAuth callback 경로:
 ## 대상 프레임워크
 
 ```text
+net8.0
 net8.0-windows7.0
 ```
 

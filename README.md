@@ -1,10 +1,19 @@
 # Dreamine.Identity
 
+[![CI](https://github.com/CodeMaru-Dreamine/Dreamine.Identity/actions/workflows/ci.yml/badge.svg)](https://github.com/CodeMaru-Dreamine/Dreamine.Identity/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=CodeMaru-Dreamine_Dreamine.Identity&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=CodeMaru-Dreamine_Dreamine.Identity)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=CodeMaru-Dreamine_Dreamine.Identity&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=CodeMaru-Dreamine_Dreamine.Identity)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=CodeMaru-Dreamine_Dreamine.Identity&metric=coverage)](https://sonarcloud.io/summary/new_code?id=CodeMaru-Dreamine_Dreamine.Identity)
+[![License](https://img.shields.io/github/license/CodeMaru-Dreamine/Dreamine.Identity)](./LICENSE)
+![.NET](https://img.shields.io/badge/.NET-8-512BD4)
+[![NuGet](https://img.shields.io/nuget/v/Dreamine.Identity.svg)](https://www.nuget.org/packages/Dreamine.Identity)
+[![Downloads](https://img.shields.io/nuget/dt/Dreamine.Identity.svg)](https://www.nuget.org/packages/Dreamine.Identity)
+
 Shared identity and authentication infrastructure for Dreamine and CodeMaru web applications.
 
 `Dreamine.Identity` provides local email/password accounts, OAuth login, a SQLite-backed user store, shared authentication cookies, and built-in account pages for Dreamine family services.
 
-[Korean documentation](./README_ko.md)
+[한국어 문서](./README_ko.md)
 
 ---
 
@@ -49,10 +58,10 @@ The package is intentionally small: application-specific ownership rules, tenant
 
 Important claim types exposed by `DreamineIdentityExtensions`:
 
-- `DreamineUserId`
-- `DreamineProvider`
+- `UserIdClaimType` (`dreamine:userid`)
+- `ProviderClaimType` (`dreamine:provider`)
 
-Use `DreamineUserId` as the stable internal user key when connecting service data to a logged-in account.
+Use the claim named by `UserIdClaimType` as the stable internal user key when connecting service data to a logged-in account.
 
 ---
 
@@ -236,9 +245,10 @@ Different providers are treated as separate identities even when they expose the
 
 ---
 
-## Target Framework
+## Target Frameworks
 
 ```text
+net8.0
 net8.0-windows7.0
 ```
 
