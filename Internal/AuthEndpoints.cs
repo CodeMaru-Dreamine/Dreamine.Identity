@@ -262,7 +262,8 @@ internal static class AuthEndpoints
                || host.EndsWith(".codemaru.co.kr", StringComparison.OrdinalIgnoreCase)
                || string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
                || string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
-               || string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase);
+               || string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(host, "[::1]", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task SignInAsync(HttpContext http, AuthUser user)
