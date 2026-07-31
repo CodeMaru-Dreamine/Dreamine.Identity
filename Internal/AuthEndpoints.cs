@@ -23,12 +23,12 @@ internal static class AuthEndpoints
     {
         endpoints.MapGet("/_identity/login", (HttpContext http, string? returnUrl, string? mode, string? message, string? error) =>
             Results.Content(
-                BuildLoginHtml(SafeReturnUrl(returnUrl), mode, message, error, "/_identity"),
+                BuildLoginHtmlLocalized(SafeReturnUrl(returnUrl), mode, message, error, "/_identity", IdentityLocalization.Resolve(http)),
                 "text/html; charset=utf-8"));
 
         endpoints.MapGet("/login", (HttpContext http, string? returnUrl, string? mode, string? message, string? error) =>
             Results.Content(
-                BuildLoginHtml(SafeReturnUrl(returnUrl), mode, message, error),
+                BuildLoginHtmlLocalized(SafeReturnUrl(returnUrl), mode, message, error, string.Empty, IdentityLocalization.Resolve(http)),
                 "text/html; charset=utf-8"));
 
         endpoints.MapPost("/_identity/login", async (HttpContext http, IUserStore userStore) =>
@@ -162,7 +162,7 @@ internal static class AuthEndpoints
         }
 
         return Results.Content(
-            BuildAccountHtml(user, SafeReturnUrl(returnUrl), message, error, routePrefix),
+            BuildAccountHtmlLocalized(user, SafeReturnUrl(returnUrl), message, error, routePrefix, IdentityLocalization.Resolve(http)),
             "text/html; charset=utf-8");
     }
 
@@ -302,22 +302,31 @@ internal static class AuthEndpoints
         string? mode,
         string? message,
         string? error,
-        string routePrefix = "")
+        string routePrefix = "") =>
+        BuildLoginHtmlLocalized(returnUrl, mode, message, error, routePrefix, IdentityLocalization.Default);
+
+    private static string BuildLoginHtmlLocalized(
+        string returnUrl,
+        string? mode,
+        string? message,
+        string? error,
+        string routePrefix,
+        IdentityLocalization.Copy copy)
     {
         var isSignup = string.Equals(mode, "signup", StringComparison.OrdinalIgnoreCase);
-        var title = isSignup ? "회원가입" : "로그인";
+        var title = isSignup ? copy.Signup : copy.Login;
         var loginPath = $"{routePrefix}/login";
         var signupPath = $"{routePrefix}/signup";
         var action = isSignup ? signupPath : loginPath;
         var switchHref = isSignup
             ? $"{loginPath}?returnUrl={Url(returnUrl)}"
             : $"{loginPath}?mode=signup&returnUrl={Url(returnUrl)}";
-        var switchText = isSignup ? "이미 계정이 있으신가요? 로그인" : "계정이 없으신가요? 회원가입";
+        var switchText = isSignup ? copy.HasAccount : copy.NoAccount;
 
         var builder = new StringBuilder();
         builder.Append($$"""
             <!DOCTYPE html>
-            <html lang="ko">
+            <html lang="{{copy.HtmlLanguage}}">
             <head>
               <meta charset="utf-8" />
               <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -431,7 +440,7 @@ internal static class AuthEndpoints
             <body>
               <main>
                 <h1>{{Html(title)}}</h1>
-                <p>하나의 계정으로 CodeMaru 및 Dreamine 계열 서비스를 이용합니다.</p>
+                <p>{{Html(copy.LoginLead)}}</p>
             """);
 
         if (!string.IsNullOrWhiteSpace(message))
@@ -452,23 +461,23 @@ internal static class AuthEndpoints
         if (isSignup)
         {
             builder.Append("""
-                  <label for="displayName">이름</label>
+                  <label for="displayName">{{Html(copy.Name)}}</label>
                   <input id="displayName" name="displayName" autocomplete="name" />
                 """);
         }
 
-        builder.Append("""
-                  <label for="email">이메일</label>
+        builder.Append($$"""
+                  <label for="email">{{Html(copy.Email)}}</label>
                   <input id="email" name="email" type="email" autocomplete="email" required />
-                  <label for="password">비밀번호</label>
+                  <label for="password">{{Html(copy.Password)}}</label>
                   <input id="password" name="password" type="password" autocomplete="current-password" required minlength="8" />
-                  <p class="form-hint">Google, Naver, Kakao로 가입한 계정은 아래 소셜 로그인 버튼을 사용하세요.</p>
+                  <p class="form-hint">{{Html(copy.SocialHint)}}</p>
             """);
 
         if (isSignup)
         {
-            builder.Append("""
-                  <label for="confirmPassword">비밀번호 확인</label>
+            builder.Append($$"""
+                  <label for="confirmPassword">{{Html(copy.ConfirmPassword)}}</label>
                   <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" required minlength="8" />
                 """);
         }
@@ -477,14 +486,13 @@ internal static class AuthEndpoints
                   <button type="submit">{{Html(title)}}</button>
                 </form>
                 <a class="switch" href="{{switchHref}}">{{Html(switchText)}}</a>
-                <div class="divider">또는</div>
+                <div class="divider">{{Html(copy.Or)}}</div>
                 <div class="browser-warning">
-                  <strong>Google 로그인 안내</strong><br />
-                  지금 화면이 앱 내부 브라우저라면 Google 로그인이 차단될 수 있습니다.
-                  오른쪽 위 메뉴에서 <strong>브라우저로 열기</strong>를 선택한 뒤 Google 로그인을 다시 시도해 주세요.
+                  <strong>{{Html(copy.GoogleGuide)}}</strong><br />
+                  {{Html(copy.EmbeddedWarning)}}
                   <div class="external-browser-actions">
-                    <a class="external-open" id="openChrome" href="#">Chrome으로 열기</a>
-                    <a class="external-open" id="openSamsung" href="#">삼성인터넷으로 열기</a>
+                    <a class="external-open" id="openChrome" href="#">{{Html(copy.OpenChrome)}}</a>
+                    <a class="external-open" id="openSamsung" href="#">{{Html(copy.OpenSamsung)}}</a>
                   </div>
                 </div>
                 <div class="socials">
@@ -518,7 +526,7 @@ internal static class AuthEndpoints
 
                   google.addEventListener("click", function (event) {
                     event.preventDefault();
-                    alert("Google 로그인은 현재 앱 내부 브라우저에서 차단될 수 있습니다. 오른쪽 위 메뉴에서 '브라우저로 열기'를 선택한 뒤 다시 시도해 주세요.");
+                    alert({{System.Text.Json.JsonSerializer.Serialize(copy.EmbeddedWarning)}});
                   });
                 })();
               </script>
@@ -534,12 +542,21 @@ internal static class AuthEndpoints
         string returnUrl,
         string? message,
         string? error,
-        string routePrefix = "")
+        string routePrefix = "") =>
+        BuildAccountHtmlLocalized(user, returnUrl, message, error, routePrefix, IdentityLocalization.Default);
+
+    private static string BuildAccountHtmlLocalized(
+        AuthUser user,
+        string returnUrl,
+        string? message,
+        string? error,
+        string routePrefix,
+        IdentityLocalization.Copy copy)
     {
         var accountPath = $"{routePrefix}/account";
         var signoutPath = $"{routePrefix}/signout";
         var provider = string.IsNullOrWhiteSpace(user.Provider) ? "Unknown" : user.Provider;
-        var email = string.IsNullOrWhiteSpace(user.Email) ? "제공되지 않음" : user.Email;
+        var email = string.IsNullOrWhiteSpace(user.Email) ? copy.NotProvided : user.Email;
         var isLocal = string.Equals(user.Provider, LocalProvider, StringComparison.OrdinalIgnoreCase);
         var avatar = string.IsNullOrWhiteSpace(user.AvatarUrl)
             ? "<div class=\"avatar-fallback\">U</div>"
@@ -547,35 +564,35 @@ internal static class AuthEndpoints
         var passwordSection = isLocal
             ? $$"""
                 <section>
-                  <h2>비밀번호 변경</h2>
+                  <h2>{{Html(copy.ChangePassword)}}</h2>
                   <form method="post" action="{{accountPath}}">
                     <input type="hidden" name="returnUrl" value="{{Html(returnUrl)}}" />
                     <input type="hidden" name="accountAction" value="password" />
-                    <label for="currentPassword">현재 비밀번호</label>
+                    <label for="currentPassword">{{Html(copy.CurrentPassword)}}</label>
                     <input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" required />
-                    <label for="newPassword">새 비밀번호</label>
+                    <label for="newPassword">{{Html(copy.NewPassword)}}</label>
                     <input id="newPassword" name="newPassword" type="password" autocomplete="new-password" required minlength="8" />
-                    <label for="confirmPassword">새 비밀번호 확인</label>
+                    <label for="confirmPassword">{{Html(copy.ConfirmNewPassword)}}</label>
                     <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" required minlength="8" />
-                    <button type="submit">비밀번호 변경</button>
+                    <button type="submit">{{Html(copy.ChangePassword)}}</button>
                   </form>
                 </section>
                 """
             : $$"""
                 <section>
-                  <h2>비밀번호</h2>
-                  <p class="note">{{Html(provider)}} 로그인 계정은 CodeMaru에 별도 비밀번호가 없습니다. 비밀번호 변경은 해당 로그인 제공자에서 진행해 주세요.</p>
+                  <h2>{{Html(copy.PasswordTitle)}}</h2>
+                  <p class="note">{{Html(string.Format(System.Globalization.CultureInfo.InvariantCulture, copy.ExternalPassword, provider))}}</p>
                 </section>
                 """;
 
         var builder = new StringBuilder();
         builder.Append($$"""
             <!DOCTYPE html>
-            <html lang="ko">
+            <html lang="{{copy.HtmlLanguage}}">
             <head>
               <meta charset="utf-8" />
               <meta name="viewport" content="width=device-width, initial-scale=1" />
-              <title>내 계정 | Dreamine Identity</title>
+              <title>{{Html(copy.Account)}} | Dreamine Identity</title>
               <style>
                 :root { color-scheme: dark; }
                 * { box-sizing: border-box; }
@@ -667,8 +684,8 @@ internal static class AuthEndpoints
                 <div class="head">
                   {{avatar}}
                   <div>
-                    <h1>내 계정</h1>
-                    <p>CodeMaru 및 Dreamine 계열 서비스에서 사용할 기본 정보를 관리합니다.</p>
+                    <h1>{{Html(copy.Account)}}</h1>
+                    <p>{{Html(copy.AccountLead)}}</p>
                   </div>
                 </div>
             """);
@@ -685,18 +702,18 @@ internal static class AuthEndpoints
 
         builder.Append($$"""
                 <dl>
-                  <div class="row"><dt>로그인 방식</dt><dd>{{Html(provider)}}</dd></div>
-                  <div class="row"><dt>이메일</dt><dd>{{Html(email)}}</dd></div>
+                  <div class="row"><dt>{{Html(copy.LoginMethod)}}</dt><dd>{{Html(provider)}}</dd></div>
+                  <div class="row"><dt>{{Html(copy.Email)}}</dt><dd>{{Html(email)}}</dd></div>
                 </dl>
                 <form method="post" action="{{accountPath}}">
                   <input type="hidden" name="returnUrl" value="{{Html(returnUrl)}}" />
                   <input type="hidden" name="accountAction" value="profile" />
-                  <label for="displayName">표시 이름</label>
+                  <label for="displayName">{{Html(copy.DisplayName)}}</label>
                   <input id="displayName" name="displayName" autocomplete="name" required value="{{Html(user.DisplayName)}}" />
                   <div class="actions">
-                    <button type="submit">저장</button>
-                    <a class="button" href="{{Html(returnUrl)}}">돌아가기</a>
-                    <a class="button" href="{{signoutPath}}?returnUrl={{Url(returnUrl)}}">로그아웃</a>
+                    <button type="submit">{{Html(copy.Save)}}</button>
+                    <a class="button" href="{{Html(returnUrl)}}">{{Html(copy.Back)}}</a>
+                    <a class="button" href="{{signoutPath}}?returnUrl={{Url(returnUrl)}}">{{Html(copy.Logout)}}</a>
                   </div>
                 </form>
                 {{passwordSection}}
