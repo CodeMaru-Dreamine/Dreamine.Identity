@@ -189,6 +189,27 @@ public static class DreamineIdentityExtensions
                 if (!string.IsNullOrWhiteSpace(authOptions.CookieDomain))
                 {
                     cookie.Cookie.Domain = authOptions.CookieDomain;
+                    // A shared production domain (for example .codemaru.co.kr)
+                    // is invalid on localhost/WPF. Use a host-only cookie there so
+                    // local sign-in and sign-out target the same cookie.
+                    cookie.Events.OnSigningIn = context =>
+                    {
+                        if (IsLocalHost(context.HttpContext.Request.Host.Host))
+                        {
+                            context.CookieOptions.Domain = null;
+                        }
+
+                        return Task.CompletedTask;
+                    };
+                    cookie.Events.OnSigningOut = context =>
+                    {
+                        if (IsLocalHost(context.HttpContext.Request.Host.Host))
+                        {
+                            context.CookieOptions.Domain = null;
+                        }
+
+                        return Task.CompletedTask;
+                    };
                 }
             });
 
@@ -238,6 +259,11 @@ public static class DreamineIdentityExtensions
         services.AddAuthorization();
         services.AddCascadingAuthenticationState();
     }
+
+    private static bool IsLocalHost(string host) =>
+        string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// \brief 로그인 성공 콜백에서 사용자 레코드를 Upsert 하고 내부 Id 클레임을 추가합니다.
