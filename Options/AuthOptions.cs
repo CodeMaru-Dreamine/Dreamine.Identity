@@ -32,6 +32,17 @@ public sealed class AuthOptions
 
     /// <summary>\brief DataProtection 격리 이름입니다. 모든 공유 로그인 앱에서 같은 값을 사용합니다.</summary>
     public string DataProtectionApplicationName { get; set; } = "Dreamine.Identity";
+
+    /// <summary>
+    /// 중앙 Identity 호스트의 OAuth를 사용하고 공용 쿠키만 소비하는 앱용 설정을 만듭니다.
+    /// </summary>
+    public AuthOptions AsConsumer() => new()
+    {
+        CookieDomain = CookieDomain,
+        CookieName = CookieName,
+        DataProtectionKeysPath = DataProtectionKeysPath,
+        DataProtectionApplicationName = DataProtectionApplicationName
+    };
 }
 
 /// <summary>
