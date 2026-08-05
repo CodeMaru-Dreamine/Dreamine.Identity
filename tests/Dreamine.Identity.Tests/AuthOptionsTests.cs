@@ -35,4 +35,34 @@ public sealed class AuthOptionsTests
 
         Assert.Equal(expected, options.IsConfigured);
     }
+
+    [Fact]
+    public void AsConsumer_CopiesOnlySharedCookieSettings()
+    {
+        var options = new AuthOptions
+        {
+            CookieDomain = ".codemaru.co.kr",
+            CookieName = ".Shared.Identity",
+            DataProtectionKeysPath = "identity-keys",
+            DataProtectionApplicationName = "CodeMaru.Identity",
+            Google = new OAuthProviderOptions
+            {
+                ClientId = "google-client",
+                ClientSecret = "google-secret"
+            }
+        };
+
+        var consumer = options.AsConsumer();
+
+        Assert.NotSame(options, consumer);
+        Assert.Equal(options.CookieDomain, consumer.CookieDomain);
+        Assert.Equal(options.CookieName, consumer.CookieName);
+        Assert.Equal(options.DataProtectionKeysPath, consumer.DataProtectionKeysPath);
+        Assert.Equal(
+            options.DataProtectionApplicationName,
+            consumer.DataProtectionApplicationName);
+        Assert.False(consumer.Google.IsConfigured);
+        Assert.False(consumer.Naver.IsConfigured);
+        Assert.False(consumer.Kakao.IsConfigured);
+    }
 }
