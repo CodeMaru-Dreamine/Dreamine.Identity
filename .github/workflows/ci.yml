@@ -123,6 +123,8 @@ jobs:
             "/o:$env:SONAR_ORGANIZATION" `
             "/v:$env:SONAR_PROJECT_VERSION" `
             "/d:sonar.token=$env:SONAR_TOKEN" `
+            "/d:sonar.qualitygate.wait=true" `
+            "/d:sonar.qualitygate.timeout=300" `
             "/d:sonar.projectBaseDir=$projectBaseDir" `
             "/d:sonar.scm.provider=git" `
             "/d:sonar.sourceEncoding=UTF-8" `
