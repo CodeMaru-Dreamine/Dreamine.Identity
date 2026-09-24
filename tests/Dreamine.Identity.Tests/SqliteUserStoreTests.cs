@@ -1,4 +1,5 @@
 using Dreamine.Database.Sqlite;
+using Dreamine.Identity.Models;
 using Microsoft.Data.Sqlite;
 
 namespace Dreamine.Identity.Tests;
@@ -16,13 +17,18 @@ public sealed class SqliteUserStoreTests : IDisposable
         var created = await store.CreateLocalAsync(
             "  USER@Example.com ",
             "  테스트 사용자  ",
-            "correct-horse-battery");
+            "correct-horse-battery",
+            Consent());
 
         Assert.True(created.Id > 0);
         Assert.Equal("Local", created.Provider);
         Assert.Equal("user@example.com", created.Email);
         Assert.Equal("테스트 사용자", created.DisplayName);
         Assert.NotEqual("correct-horse-battery", created.PasswordHash);
+        Assert.NotNull(created.TermsAcceptedAtUtc);
+        Assert.Equal(IdentityConsentPolicy.CurrentTermsVersion, created.TermsVersion);
+        Assert.NotNull(created.PrivacyAcceptedAtUtc);
+        Assert.NotNull(created.MinimumAgeConfirmedAtUtc);
 
         Assert.Null(await store.ValidateLocalAsync("user@example.com", "wrong-password"));
 
@@ -42,12 +48,12 @@ public sealed class SqliteUserStoreTests : IDisposable
         var store = CreateStore();
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => store.CreateLocalAsync("user@example.com", "사용자", "short"));
+            () => store.CreateLocalAsync("user@example.com", "사용자", "short", Consent()));
 
-        await store.CreateLocalAsync("user@example.com", "사용자", "long-enough-password");
+        await store.CreateLocalAsync("user@example.com", "사용자", "long-enough-password", Consent());
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => store.CreateLocalAsync("USER@example.com", "다른 사용자", "another-password"));
+            () => store.CreateLocalAsync("USER@example.com", "다른 사용자", "another-password", Consent()));
     }
 
     [Fact]
@@ -57,7 +63,8 @@ public sealed class SqliteUserStoreTests : IDisposable
         var user = await store.CreateLocalAsync(
             "user@example.com",
             "사용자",
-            "old-password");
+            "old-password",
+            Consent());
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => store.ChangeLocalPasswordAsync(user.Id, "incorrect", "new-password"));
@@ -82,7 +89,8 @@ public sealed class SqliteUserStoreTests : IDisposable
             "provider-key",
             "old@example.com",
             "Old Name",
-            "https://example.com/old.png");
+            "https://example.com/old.png",
+            Consent());
         var updated = await store.UpsertAsync(
             "Google",
             "provider-key",
@@ -95,10 +103,22 @@ public sealed class SqliteUserStoreTests : IDisposable
         Assert.Equal("New Name", updated.DisplayName);
         Assert.Equal("https://example.com/new.png", updated.AvatarUrl);
         Assert.NotNull(await store.GetByIdAsync(updated.Id));
+        Assert.NotNull(await store.FindByProviderAsync("Google", "provider-key"));
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => store.ChangeLocalPasswordAsync(updated.Id, "old-password", "new-password"));
     }
+
+    [Fact]
+    public async Task NewAccount_RejectsMissingRegistrationConsent()
+    {
+        var store = CreateStore();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            store.UpsertAsync("Google", "new-key", "user@example.com", "User", ""));
+    }
+
+    private static RegistrationConsent Consent() => IdentityConsentPolicy.Create(DateTime.UtcNow);
 
     private SqliteUserStore CreateStore()
     {

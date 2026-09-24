@@ -35,6 +35,21 @@ public sealed class AuthUser
     /// <summary>\brief 로컬 이메일 로그인용 비밀번호 해시입니다.</summary>
     public string PasswordHash { get; set; } = string.Empty;
 
+    /// <summary>\brief 이용약관에 동의한 시각 (UTC) 입니다.</summary>
+    public DateTime? TermsAcceptedAtUtc { get; set; }
+
+    /// <summary>\brief 동의한 이용약관 버전입니다.</summary>
+    public string TermsVersion { get; set; } = string.Empty;
+
+    /// <summary>\brief 개인정보 수집·이용에 동의한 시각 (UTC) 입니다.</summary>
+    public DateTime? PrivacyAcceptedAtUtc { get; set; }
+
+    /// <summary>\brief 동의한 개인정보처리방침 버전입니다.</summary>
+    public string PrivacyVersion { get; set; } = string.Empty;
+
+    /// <summary>\brief 만 14세 이상임을 확인한 시각 (UTC) 입니다.</summary>
+    public DateTime? MinimumAgeConfirmedAtUtc { get; set; }
+
     /// <summary>\brief 최초 가입 시각 (UTC) 입니다.</summary>
     public DateTime CreatedAt { get; set; }
 

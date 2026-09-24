@@ -10,7 +10,9 @@ namespace Dreamine.Identity;
 public sealed class SqliteUserStore : IUserStore
 {
     private const string SelectSql =
-        "SELECT Id, Provider, ProviderKey, Email, DisplayName, AvatarUrl, PasswordHash, CreatedAt, LastLoginAt " +
+        "SELECT Id, Provider, ProviderKey, Email, DisplayName, AvatarUrl, PasswordHash, " +
+        "TermsAcceptedAtUtc, TermsVersion, PrivacyAcceptedAtUtc, PrivacyVersion, MinimumAgeConfirmedAtUtc, " +
+        "CreatedAt, LastLoginAt " +
         "FROM Users WHERE Provider = @Provider AND ProviderKey = @ProviderKey LIMIT 1";
 
     private const string LocalProvider = "Local";
@@ -33,6 +35,7 @@ public sealed class SqliteUserStore : IUserStore
         string email,
         string displayName,
         string avatarUrl,
+        RegistrationConsent? registrationConsent = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
@@ -50,10 +53,15 @@ public sealed class SqliteUserStore : IUserStore
             existing.DisplayName = displayName ?? string.Empty;
             existing.AvatarUrl = avatarUrl ?? string.Empty;
             existing.LastLoginAt = now;
+            if (registrationConsent is not null && existing.TermsAcceptedAtUtc is null)
+            {
+                ApplyRegistrationConsent(existing, registrationConsent);
+            }
             await _database.UpdateAsync(existing, cancellationToken).ConfigureAwait(false);
             return existing;
         }
 
+        ValidateRegistrationConsent(registrationConsent);
         var created = new AuthUser
         {
             Provider = provider,
@@ -65,6 +73,7 @@ public sealed class SqliteUserStore : IUserStore
             CreatedAt = now,
             LastLoginAt = now
         };
+        ApplyRegistrationConsent(created, registrationConsent!);
 
         await _database.InsertAsync(created, cancellationToken).ConfigureAwait(false);
 
@@ -74,10 +83,25 @@ public sealed class SqliteUserStore : IUserStore
             cancellationToken).ConfigureAwait(false)).First();
     }
 
+    public async Task<AuthUser?> FindByProviderAsync(
+        string provider,
+        string providerKey,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(provider);
+        ArgumentException.ThrowIfNullOrWhiteSpace(providerKey);
+        return (await _database.QueryAsync<AuthUser>(
+            SelectSql,
+            new { Provider = provider, ProviderKey = providerKey },
+            cancellationToken).ConfigureAwait(false)).FirstOrDefault();
+    }
+
     public async Task<AuthUser?> GetByIdAsync(long id, CancellationToken cancellationToken = default)
     {
         var rows = await _database.QueryAsync<AuthUser>(
-            "SELECT Id, Provider, ProviderKey, Email, DisplayName, AvatarUrl, PasswordHash, CreatedAt, LastLoginAt " +
+            "SELECT Id, Provider, ProviderKey, Email, DisplayName, AvatarUrl, PasswordHash, " +
+            "TermsAcceptedAtUtc, TermsVersion, PrivacyAcceptedAtUtc, PrivacyVersion, MinimumAgeConfirmedAtUtc, " +
+            "CreatedAt, LastLoginAt " +
             "FROM Users WHERE Id = @Id LIMIT 1",
             new { Id = id },
             cancellationToken).ConfigureAwait(false);
@@ -144,8 +168,10 @@ public sealed class SqliteUserStore : IUserStore
         string email,
         string displayName,
         string password,
+        RegistrationConsent registrationConsent,
         CancellationToken cancellationToken = default)
     {
+        ValidateRegistrationConsent(registrationConsent);
         email = NormalizeEmail(email);
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
 
@@ -172,6 +198,7 @@ public sealed class SqliteUserStore : IUserStore
             CreatedAt = now,
             LastLoginAt = now
         };
+        ApplyRegistrationConsent(user, registrationConsent);
 
         await _database.InsertAsync(user, cancellationToken).ConfigureAwait(false);
 
@@ -200,7 +227,9 @@ public sealed class SqliteUserStore : IUserStore
         CancellationToken cancellationToken)
     {
         var rows = await _database.QueryAsync<AuthUser>(
-            "SELECT Id, Provider, ProviderKey, Email, DisplayName, AvatarUrl, PasswordHash, CreatedAt, LastLoginAt " +
+            "SELECT Id, Provider, ProviderKey, Email, DisplayName, AvatarUrl, PasswordHash, " +
+            "TermsAcceptedAtUtc, TermsVersion, PrivacyAcceptedAtUtc, PrivacyVersion, MinimumAgeConfirmedAtUtc, " +
+            "CreatedAt, LastLoginAt " +
             "FROM Users WHERE Provider = @Provider AND ProviderKey = @ProviderKey LIMIT 1",
             new { Provider = LocalProvider, ProviderKey = email },
             cancellationToken).ConfigureAwait(false);
@@ -218,6 +247,43 @@ public sealed class SqliteUserStore : IUserStore
         {
             _database.ExecuteNonQuery("ALTER TABLE Users ADD COLUMN PasswordHash TEXT NOT NULL DEFAULT ''");
         }
+
+        AddColumnIfMissing(columns, nameof(AuthUser.TermsAcceptedAtUtc), "TEXT NULL");
+        AddColumnIfMissing(columns, nameof(AuthUser.TermsVersion), "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(columns, nameof(AuthUser.PrivacyAcceptedAtUtc), "TEXT NULL");
+        AddColumnIfMissing(columns, nameof(AuthUser.PrivacyVersion), "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(columns, nameof(AuthUser.MinimumAgeConfirmedAtUtc), "TEXT NULL");
+    }
+
+    private void AddColumnIfMissing(ISet<string> columns, string name, string sqlType)
+    {
+        if (!columns.Contains(name))
+        {
+            _database.ExecuteNonQuery($"ALTER TABLE Users ADD COLUMN {name} {sqlType}");
+            columns.Add(name);
+        }
+    }
+
+    private static void ValidateRegistrationConsent(RegistrationConsent? consent)
+    {
+        if (consent is null
+            || consent.TermsAcceptedAtUtc == default
+            || consent.PrivacyAcceptedAtUtc == default
+            || consent.MinimumAgeConfirmedAtUtc == default
+            || !string.Equals(consent.TermsVersion, IdentityConsentPolicy.CurrentTermsVersion, StringComparison.Ordinal)
+            || !string.Equals(consent.PrivacyVersion, IdentityConsentPolicy.CurrentPrivacyVersion, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("필수 약관 동의와 만 14세 이상 확인이 필요합니다.");
+        }
+    }
+
+    private static void ApplyRegistrationConsent(AuthUser user, RegistrationConsent consent)
+    {
+        user.TermsAcceptedAtUtc = consent.TermsAcceptedAtUtc;
+        user.TermsVersion = consent.TermsVersion;
+        user.PrivacyAcceptedAtUtc = consent.PrivacyAcceptedAtUtc;
+        user.PrivacyVersion = consent.PrivacyVersion;
+        user.MinimumAgeConfirmedAtUtc = consent.MinimumAgeConfirmedAtUtc;
     }
 
     private static string NormalizeEmail(string email)

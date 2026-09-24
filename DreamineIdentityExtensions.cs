@@ -2,6 +2,7 @@ using System.Security.Claims;
 using AspNet.Security.OAuth.Naver;
 using Dreamine.Database.Abstractions;
 using Dreamine.Database.Sqlite;
+using Dreamine.Identity.Models;
 #if WINDOWS
 using Dreamine.Hybrid.Wpf.Hosting;
 #endif
@@ -14,6 +15,7 @@ using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +34,18 @@ public static class DreamineIdentityExtensions
 
     /// <summary>\brief User 클레임에 로그인한 프로바이더 이름을 넣는 커스텀 클레임 이름입니다.</summary>
     public const string ProviderClaimType = "dreamine:provider";
+
+    /// <summary>\brief OAuth 왕복 동안 신규 가입 필수 동의 확인을 전달하는 인증 속성 이름입니다.</summary>
+    public const string RegistrationConsentProperty = "dreamine:registration-consent";
+
+    /// <summary>\brief OAuth 왕복 동안 이용약관 버전을 전달하는 인증 속성 이름입니다.</summary>
+    public const string TermsVersionProperty = "dreamine:terms-version";
+
+    /// <summary>\brief OAuth 왕복 동안 개인정보처리방침 버전을 전달하는 인증 속성 이름입니다.</summary>
+    public const string PrivacyVersionProperty = "dreamine:privacy-version";
+
+    /// <summary>\brief OAuth 왕복과 실패 복귀 시 선택 언어를 유지하는 인증 속성 이름입니다.</summary>
+    public const string LanguageProperty = "dreamine:language";
 
     private const string ProviderGoogle = "Google";
     private const string ProviderNaver = "Naver";
@@ -211,6 +225,12 @@ public static class DreamineIdentityExtensions
                         return Task.CompletedTask;
                     };
                 }
+
+                if (authOptions.UseCentralPortal)
+                {
+                    cookie.Events.OnRedirectToLogin = RedirectToCentralLoginAsync;
+                    cookie.Events.OnRedirectToAccessDenied = RedirectToCentralLoginAsync;
+                }
             });
 
         if (authOptions.Google.IsConfigured)
@@ -222,6 +242,7 @@ public static class DreamineIdentityExtensions
                 google.CallbackPath = "/signin-google";
                 google.SaveTokens = false;
                 google.Events.OnCreatingTicket = context => OnCreatingTicketAsync(context, ProviderGoogle);
+                google.Events.OnRemoteFailure = HandleRemoteFailureAsync;
             });
         }
 
@@ -234,6 +255,7 @@ public static class DreamineIdentityExtensions
                 naver.CallbackPath = "/signin-naver";
                 naver.SaveTokens = false;
                 naver.Events.OnCreatingTicket = context => OnCreatingTicketAsync(context, ProviderNaver);
+                naver.Events.OnRemoteFailure = HandleRemoteFailureAsync;
             });
         }
 
@@ -253,6 +275,7 @@ public static class DreamineIdentityExtensions
                 kakao.Scope.Add("profile_nickname");
                 kakao.Scope.Add("profile_image");
                 kakao.Events.OnCreatingTicket = OnKakaoCreatingTicketAsync;
+                kakao.Events.OnRemoteFailure = HandleRemoteFailureAsync;
             });
         }
 
@@ -264,6 +287,19 @@ public static class DreamineIdentityExtensions
         string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
         || string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
         || string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase);
+
+    private static Task RedirectToCentralLoginAsync(
+        RedirectContext<CookieAuthenticationOptions> context)
+    {
+        var request = context.Request;
+        var returnUrl = request.GetEncodedUrl();
+        var language = request.Query.TryGetValue("lang", out var languageValues)
+            ? languageValues.FirstOrDefault()
+            : null;
+
+        context.Response.Redirect(DreamineIdentityPortal.CreateUrl("login", returnUrl, language));
+        return Task.CompletedTask;
+    }
 
     /// <summary>
     /// \brief 로그인 성공 콜백에서 사용자 레코드를 Upsert 하고 내부 Id 클레임을 추가합니다.
@@ -366,17 +402,67 @@ public static class DreamineIdentityExtensions
         }
 
         var userStore = context.HttpContext.RequestServices.GetRequiredService<IUserStore>();
+        var existing = await userStore.FindByProviderAsync(
+            providerName,
+            providerKey,
+            context.HttpContext.RequestAborted).ConfigureAwait(false);
+
+        RegistrationConsent? registrationConsent = null;
+        var hasCurrentConsent =
+            string.Equals(
+                ReadAuthenticationProperty(context.Properties, RegistrationConsentProperty),
+                "accepted",
+                StringComparison.Ordinal)
+            && string.Equals(
+                ReadAuthenticationProperty(context.Properties, TermsVersionProperty),
+                IdentityConsentPolicy.CurrentTermsVersion,
+                StringComparison.Ordinal)
+            && string.Equals(
+                ReadAuthenticationProperty(context.Properties, PrivacyVersionProperty),
+                IdentityConsentPolicy.CurrentPrivacyVersion,
+                StringComparison.Ordinal);
+
+        if (hasCurrentConsent)
+        {
+            registrationConsent = IdentityConsentPolicy.Create(DateTime.UtcNow);
+        }
+        else if (existing is null)
+        {
+            context.Fail("소셜 신규 가입은 필수 약관 동의와 만 14세 이상 확인이 필요합니다.");
+            return;
+        }
+
         var user = await userStore.UpsertAsync(
             providerName,
             providerKey,
             email,
             displayName,
             avatarUrl,
+            registrationConsent,
             context.HttpContext.RequestAborted).ConfigureAwait(false);
 
         identity.AddClaim(new Claim(UserIdClaimType, user.Id.ToString()));
         identity.AddClaim(new Claim(ProviderClaimType, providerName));
     }
+
+    private static Task HandleRemoteFailureAsync(RemoteFailureContext context)
+    {
+        var message = context.Failure?.Message.Contains("필수 약관 동의", StringComparison.Ordinal) == true
+            ? context.Failure.Message
+            : "소셜 로그인을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+        var properties = context.Properties;
+        var language = properties is null
+            ? "ko"
+            : ReadAuthenticationProperty(properties, LanguageProperty) ?? "ko";
+        var returnUrl = properties?.RedirectUri ?? "/";
+        context.Response.Redirect(
+            $"/_identity/login?mode=signup&lang={Uri.EscapeDataString(language)}&returnUrl={Uri.EscapeDataString(returnUrl)}&error={Uri.EscapeDataString(message)}");
+        context.HandleResponse();
+        return Task.CompletedTask;
+    }
+
+    private static string? ReadAuthenticationProperty(AuthenticationProperties properties, string name) =>
+        properties.Items.TryGetValue(name, out var value) ? value : null;
 
     private static JsonElement? TryGetProperty(JsonElement element, string name) =>
         element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value)
