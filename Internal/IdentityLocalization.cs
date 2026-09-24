@@ -4,6 +4,19 @@ namespace Dreamine.Identity.Internal;
 
 internal static class IdentityLocalization
 {
+    internal sealed record LanguageOption(string Code, string Flag, string NativeName);
+
+    internal sealed record ConsentCopy(
+        string RequiredConsents,
+        string RequiredPrefix,
+        string TermsAgreement,
+        string PrivacyAgreement,
+        string MinimumAgeConfirmation,
+        string MinimumAgeNotice,
+        string ConsentRequiredMessage,
+        string SignupNotice,
+        string LegalNotice);
+
     internal sealed record Copy(
         string HtmlLanguage, string Login, string Signup, string LoginLead, string Name, string Email,
         string Password, string SocialHint, string ConfirmPassword, string HasAccount, string NoAccount,
@@ -12,6 +25,35 @@ internal static class IdentityLocalization
         string Save, string Back, string Logout, string ChangePassword, string CurrentPassword,
         string NewPassword, string ConfirmNewPassword, string PasswordTitle, string ExternalPassword,
         string NotProvided);
+
+    internal static IReadOnlyList<LanguageOption> Languages { get; } =
+    [
+        new("en", "US", "English"),
+        new("es", "ES", "Español"),
+        new("fr", "FR", "Français"),
+        new("it", "IT", "Italiano"),
+        new("pt", "PT", "Português"),
+        new("ko", "KR", "한국어"),
+        new("ja", "JP", "日本語"),
+        new("zh-hans", "CN", "简体中文"),
+        new("zh-hant", "HK", "繁體中文"),
+        new("vi", "VN", "Tiếng Việt")
+    ];
+
+    private static readonly IReadOnlyDictionary<string, ConsentCopy> ConsentCopies =
+        new Dictionary<string, ConsentCopy>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ko"] = new("필수 동의", "필수", "이용약관 동의", "개인정보 수집·이용 동의", "만 14세 이상입니다.", "만 14세 미만은 법정대리인 동의 확인 절차가 필요하여 현재 직접 가입할 수 없습니다.", "필수 약관 동의와 만 14세 이상 확인을 완료해 주세요.", "처음 이용하시나요? 회원가입 탭에서 필수 동의를 완료해 주세요.", "계정 생성 시 이용약관·개인정보처리방침 동의와 만 14세 이상 확인이 필요합니다."),
+            ["en"] = new("Required consents", "Required", "Agree to the Terms of Service", "Agree to the collection and use of personal data", "I am at least 14 years old.", "Users under 14 cannot register directly because verified consent from a legal guardian is required.", "Please complete the required consents and age confirmation.", "New here? Open the Create account tab and complete the required consents.", "Creating an account requires agreement to the Terms and Privacy Policy and confirmation that you are at least 14."),
+            ["es"] = new("Consentimientos obligatorios", "Obligatorio", "Aceptar los Términos del servicio", "Aceptar la recopilación y el uso de datos personales", "Tengo al menos 14 años.", "Los menores de 14 años no pueden registrarse directamente porque se requiere el consentimiento verificado de un tutor legal.", "Completa los consentimientos obligatorios y la confirmación de edad.", "¿Es tu primera vez? Abre la pestaña Crear cuenta y completa los consentimientos obligatorios.", "Para crear una cuenta debes aceptar los Términos y la Política de privacidad y confirmar que tienes al menos 14 años."),
+            ["fr"] = new("Consentements obligatoires", "Obligatoire", "Accepter les Conditions d’utilisation", "Accepter la collecte et l’utilisation des données personnelles", "J’ai au moins 14 ans.", "Les moins de 14 ans ne peuvent pas s’inscrire directement, car le consentement vérifié d’un représentant légal est requis.", "Veuillez compléter les consentements obligatoires et la confirmation d’âge.", "Première visite ? Ouvrez l’onglet Créer un compte et complétez les consentements obligatoires.", "La création d’un compte exige l’acceptation des Conditions et de la Politique de confidentialité ainsi que la confirmation d’avoir au moins 14 ans."),
+            ["it"] = new("Consensi obbligatori", "Obbligatorio", "Accetta i Termini di servizio", "Accetta la raccolta e l’uso dei dati personali", "Ho almeno 14 anni.", "I minori di 14 anni non possono registrarsi direttamente perché è richiesto il consenso verificato di un tutore legale.", "Completa i consensi obbligatori e la conferma dell’età.", "È la prima volta? Apri la scheda Crea account e completa i consensi obbligatori.", "Per creare un account devi accettare i Termini e l’Informativa sulla privacy e confermare di avere almeno 14 anni."),
+            ["pt"] = new("Consentimentos obrigatórios", "Obrigatório", "Aceitar os Termos de Serviço", "Aceitar a coleta e o uso de dados pessoais", "Tenho pelo menos 14 anos.", "Menores de 14 anos não podem se cadastrar diretamente porque é necessário o consentimento verificado de um responsável legal.", "Conclua os consentimentos obrigatórios e a confirmação de idade.", "Primeira vez? Abra a aba Criar conta e conclua os consentimentos obrigatórios.", "A criação de uma conta exige a aceitação dos Termos e da Política de Privacidade e a confirmação de que você tem pelo menos 14 anos."),
+            ["ja"] = new("必須同意", "必須", "利用規約に同意する", "個人情報の収集・利用に同意する", "14歳以上です。", "14歳未満の方は法定代理人の確認済み同意が必要なため、現在は直接登録できません。", "必須同意と年齢確認を完了してください。", "初めてですか？「アカウント作成」タブで必須同意を完了してください。", "アカウント作成には、利用規約・プライバシーポリシーへの同意と14歳以上であることの確認が必要です。"),
+            ["zh-hans"] = new("必要同意", "必选", "同意服务条款", "同意收集和使用个人信息", "我已年满14周岁。", "未满14周岁的用户需要经核实的法定监护人同意，因此目前无法直接注册。", "请完成必要同意和年龄确认。", "首次使用？请打开“创建账户”选项卡并完成必要同意。", "创建账户需要同意服务条款和隐私政策，并确认已年满14周岁。"),
+            ["zh-hant"] = new("必要同意", "必選", "同意服務條款", "同意蒐集與使用個人資料", "我已年滿14歲。", "未滿14歲的使用者需要經核實的法定監護人同意，因此目前無法直接註冊。", "請完成必要同意與年齡確認。", "首次使用？請開啟「建立帳戶」分頁並完成必要同意。", "建立帳戶需要同意服務條款與隱私權政策，並確認已年滿14歲。"),
+            ["vi"] = new("Đồng ý bắt buộc", "Bắt buộc", "Đồng ý Điều khoản dịch vụ", "Đồng ý việc thu thập và sử dụng dữ liệu cá nhân", "Tôi từ đủ 14 tuổi.", "Người dưới 14 tuổi chưa thể đăng ký trực tiếp vì cần có sự đồng ý đã xác minh của người giám hộ hợp pháp.", "Vui lòng hoàn tất các mục đồng ý bắt buộc và xác nhận độ tuổi.", "Lần đầu sử dụng? Hãy mở thẻ Tạo tài khoản và hoàn tất các mục đồng ý bắt buộc.", "Để tạo tài khoản, bạn phải đồng ý với Điều khoản, Chính sách quyền riêng tư và xác nhận từ đủ 14 tuổi.")
+        };
 
     private static readonly IReadOnlyDictionary<string, Copy> Copies = new Dictionary<string, Copy>(StringComparer.OrdinalIgnoreCase)
     {
@@ -29,6 +71,18 @@ internal static class IdentityLocalization
 
     internal static Copy Default => Copies["ko"];
 
+    internal static ConsentCopy Consent(Copy copy) => ConsentCopies[LanguageKey(copy)];
+
+    internal static ConsentCopy Consent(string? language) => ConsentCopies[NormalizeLanguage(language)];
+
+    internal static string LanguageKey(Copy copy) => Normalize(copy.HtmlLanguage);
+
+    internal static string NormalizeLanguage(string? language)
+    {
+        var normalized = Normalize(language);
+        return Copies.ContainsKey(normalized) ? normalized : "ko";
+    }
+
     internal static Copy Resolve(HttpContext http)
     {
         var language = http.Request.Query["lang"].ToString();
@@ -37,7 +91,34 @@ internal static class IdentityLocalization
             language = http.Request.Cookies["dreamine-language"];
         }
 
-        language = language?.Trim().ToLowerInvariant().Replace('_', '-');
-        return language is not null && Copies.TryGetValue(language, out var copy) ? copy : Copies["ko"];
+        if (string.IsNullOrWhiteSpace(language))
+        {
+            language = http.Request.GetTypedHeaders().AcceptLanguage?
+                .OrderByDescending(item => item.Quality ?? 1)
+                .Select(item => item.Value.Value)
+                .FirstOrDefault();
+        }
+
+        language = Normalize(language);
+        return Copies.TryGetValue(language, out var copy) ? copy : Copies["ko"];
+    }
+
+    private static string Normalize(string? language)
+    {
+        var normalized = language?.Trim().ToLowerInvariant().Replace('_', '-') ?? string.Empty;
+        return normalized switch
+        {
+            "zh" or "zh-cn" or "zh-sg" => "zh-hans",
+            "zh-tw" or "zh-hk" or "zh-mo" => "zh-hant",
+            _ when normalized.StartsWith("en-", StringComparison.Ordinal) => "en",
+            _ when normalized.StartsWith("es-", StringComparison.Ordinal) => "es",
+            _ when normalized.StartsWith("fr-", StringComparison.Ordinal) => "fr",
+            _ when normalized.StartsWith("it-", StringComparison.Ordinal) => "it",
+            _ when normalized.StartsWith("pt-", StringComparison.Ordinal) => "pt",
+            _ when normalized.StartsWith("ko-", StringComparison.Ordinal) => "ko",
+            _ when normalized.StartsWith("ja-", StringComparison.Ordinal) => "ja",
+            _ when normalized.StartsWith("vi-", StringComparison.Ordinal) => "vi",
+            _ => normalized
+        };
     }
 }

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Dreamine.Identity.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Primitives;
 
@@ -61,6 +62,10 @@ public sealed class AuthEndpointsTests
         Assert.Contains("&lt;saved&gt;", html);
         Assert.Contains("&quot;invalid&quot;", html);
         Assert.Contains("returnUrl=%2Forders%3Fa%3D1%26b%3D2", html);
+        Assert.Contains("id=\"identityLanguage\"", html);
+        Assert.Contains("회원가입 탭에서 필수 동의를 완료", html);
+        Assert.Contains("https://codemaru.co.kr/terms?lang=ko", html);
+        Assert.Contains("https://codemaru.co.kr/privacy?lang=ko", html);
         Assert.DoesNotContain("confirmPassword", html);
     }
 
@@ -79,7 +84,83 @@ public sealed class AuthEndpointsTests
         Assert.Contains("action=\"/signup\"", html);
         Assert.Contains("name=\"displayName\"", html);
         Assert.Contains("name=\"confirmPassword\"", html);
-        Assert.Contains("href=\"/login?returnUrl=%2F\"", html);
+        Assert.Contains("name=\"termsAccepted\"", html);
+        Assert.Contains("name=\"privacyAccepted\"", html);
+        Assert.Contains("name=\"minimumAgeConfirmed\"", html);
+        Assert.Contains("https://codemaru.co.kr/terms", html);
+        Assert.Contains("https://codemaru.co.kr/privacy", html);
+        Assert.Contains("formaction=\"/signin/google\"", html);
+        Assert.Contains("formaction=\"/signin/naver\"", html);
+        Assert.Contains("formaction=\"/signin/kakao\"", html);
+        Assert.DoesNotContain("registrationConsent=accepted", html);
+        Assert.Contains("href=\"/login?lang=ko&amp;returnUrl=%2F\"", html);
+    }
+
+    [Theory]
+    [InlineData("en", "Create account", "Required consents")]
+    [InlineData("es", "Crear cuenta", "Consentimientos obligatorios")]
+    [InlineData("fr", "Créer un compte", "Consentements obligatoires")]
+    [InlineData("it", "Crea account", "Consensi obbligatori")]
+    [InlineData("pt", "Criar conta", "Consentimentos obrigatórios")]
+    [InlineData("ko", "회원가입", "필수 동의")]
+    [InlineData("ja", "アカウント作成", "必須同意")]
+    [InlineData("zh-cn", "创建账户", "必要同意")]
+    [InlineData("zh-tw", "建立帳戶", "必要同意")]
+    [InlineData("vi", "Tạo tài khoản", "Đồng ý bắt buộc")]
+    public void BuildLoginHtmlLocalized_SupportsAllPortalLanguages(
+        string language,
+        string signupText,
+        string consentText)
+    {
+        var copy = ResolveLocalization(language);
+        var html = Invoke<string>(
+            "BuildLoginHtmlLocalized",
+            "/",
+            "signup",
+            null!,
+            null!,
+            "/_identity",
+            copy);
+        var decoded = System.Net.WebUtility.HtmlDecode(html);
+
+        Assert.Contains(signupText, decoded);
+        Assert.Contains(consentText, decoded);
+        Assert.Equal(10, html.Split("<option value=", StringSplitOptions.None).Length - 1);
+    }
+
+    [Fact]
+    public async Task HandleSocialSignupAsync_RejectsMissingServerSideConsent()
+    {
+        var context = CreateFormContext(("returnUrl", "/game"), ("lang", "en"));
+
+        var result = await InvokeAsync("HandleSocialSignupAsync", context, "Google");
+
+        var redirect = Assert.IsType<RedirectHttpResult>(result);
+        Assert.Contains("mode=signup", redirect.Url);
+        Assert.Contains("lang=en", redirect.Url);
+        Assert.Contains("Please%20complete%20the%20required%20consents", redirect.Url);
+    }
+
+    [Fact]
+    public async Task HandleSocialSignupAsync_AddsConsentOnlyAfterAllChecks()
+    {
+        var context = CreateFormContext(
+            ("returnUrl", "/game"),
+            ("lang", "ko"),
+            ("termsAccepted", "on"),
+            ("privacyAccepted", "on"),
+            ("minimumAgeConfirmed", "on"));
+
+        var result = await InvokeAsync("HandleSocialSignupAsync", context, "Kakao");
+
+        var challenge = Assert.IsType<ChallengeHttpResult>(result);
+        Assert.Contains("Kakao", challenge.AuthenticationSchemes);
+        Assert.Equal(
+            "accepted",
+            challenge.Properties?.Items[DreamineIdentityExtensions.RegistrationConsentProperty]);
+        Assert.Equal(
+            "ko",
+            challenge.Properties?.Items[DreamineIdentityExtensions.LanguageProperty]);
     }
 
     [Fact]
@@ -209,7 +290,10 @@ public sealed class AuthEndpointsTests
             ("email", "user@example.com"),
             ("displayName", "User"),
             ("password", "password1"),
-            ("confirmPassword", "password1"));
+            ("confirmPassword", "password1"),
+            ("termsAccepted", "on"),
+            ("privacyAccepted", "on"),
+            ("minimumAgeConfirmed", "on"));
         Assert.NotNull(await InvokeAsync(
             "HandleSignupAsync",
             failureContext,
@@ -222,12 +306,30 @@ public sealed class AuthEndpointsTests
             ("email", "new@example.com"),
             ("displayName", "New User"),
             ("password", "password1"),
-            ("confirmPassword", "password1"));
+            ("confirmPassword", "password1"),
+            ("termsAccepted", "on"),
+            ("privacyAccepted", "on"),
+            ("minimumAgeConfirmed", "on"));
         Assert.NotNull(await InvokeAsync(
             "HandleSignupAsync",
             successContext,
             store,
             "/_identity"));
+        Assert.NotNull(store.CreatedConsent);
+    }
+
+    [Fact]
+    public async Task Signup_RejectsMissingRequiredConsent()
+    {
+        var store = new StubUserStore();
+        var context = CreateFormContext(
+            ("returnUrl", "/"),
+            ("email", "user@example.com"),
+            ("password", "password1"),
+            ("confirmPassword", "password1"));
+
+        Assert.NotNull(await InvokeAsync("HandleSignupAsync", context, store, "/_identity"));
+        Assert.Null(store.CreatedConsent);
     }
 
     [Fact]
@@ -358,6 +460,20 @@ public sealed class AuthEndpointsTests
         return (T)method.Invoke(null, arguments)!;
     }
 
+    private static object ResolveLocalization(string language)
+    {
+        var type = typeof(DreamineIdentityExtensions).Assembly.GetType(
+            "Dreamine.Identity.Internal.IdentityLocalization",
+            throwOnError: true)!;
+        var method = type.GetMethod(
+            "Resolve",
+            BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("IdentityLocalization.Resolve was not found.");
+        var context = new DefaultHttpContext();
+        context.Request.QueryString = new QueryString($"?lang={Uri.EscapeDataString(language)}");
+        return method.Invoke(null, [context])!;
+    }
+
     private static async Task<object> InvokeAsync(string methodName, params object?[] arguments)
     {
         var type = typeof(DreamineIdentityExtensions).Assembly.GetType(
@@ -455,6 +571,7 @@ public sealed class AuthEndpointsTests
         public AuthUser? ChangedUser { get; set; }
         public Exception? CreateException { get; set; }
         public Exception? ChangePasswordException { get; set; }
+        public RegistrationConsent? CreatedConsent { get; set; }
 
         public Task<AuthUser> UpsertAsync(
             string provider,
@@ -462,8 +579,15 @@ public sealed class AuthEndpointsTests
             string email,
             string displayName,
             string avatarUrl,
+            RegistrationConsent? registrationConsent = null,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<AuthUser?> FindByProviderAsync(
+            string provider,
+            string providerKey,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<AuthUser?>(null);
 
         public Task<AuthUser?> GetByIdAsync(
             long id,
@@ -489,10 +613,14 @@ public sealed class AuthEndpointsTests
             string email,
             string displayName,
             string password,
-            CancellationToken cancellationToken = default) =>
-            CreateException is null
+            RegistrationConsent registrationConsent,
+            CancellationToken cancellationToken = default)
+        {
+            CreatedConsent = registrationConsent;
+            return CreateException is null
                 ? Task.FromResult(CreateUser("Local", email, displayName, ""))
                 : Task.FromException<AuthUser>(CreateException);
+        }
 
         public Task<AuthUser?> ValidateLocalAsync(
             string email,

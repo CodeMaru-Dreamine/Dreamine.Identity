@@ -12,6 +12,7 @@ public sealed class AuthOptionsTests
         Assert.Equal("Authentication", AuthOptions.SectionName);
         Assert.Equal(".Dreamine.Identity", options.CookieName);
         Assert.Equal("Dreamine.Identity", options.DataProtectionApplicationName);
+        Assert.False(options.UseCentralPortal);
         Assert.False(options.Google.IsConfigured);
         Assert.False(options.Naver.IsConfigured);
         Assert.False(options.Kakao.IsConfigured);
@@ -61,6 +62,7 @@ public sealed class AuthOptionsTests
         Assert.Equal(
             options.DataProtectionApplicationName,
             consumer.DataProtectionApplicationName);
+        Assert.True(consumer.UseCentralPortal);
         Assert.False(consumer.Google.IsConfigured);
         Assert.False(consumer.Naver.IsConfigured);
         Assert.False(consumer.Kakao.IsConfigured);

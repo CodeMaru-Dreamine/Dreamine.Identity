@@ -34,6 +34,11 @@ public sealed class AuthOptions
     public string DataProtectionApplicationName { get; set; } = "Dreamine.Identity";
 
     /// <summary>
+    /// \brief 현재 앱이 로그인 화면을 직접 제공하지 않고 중앙 Identity 포털을 사용하는지 여부입니다.
+    /// </summary>
+    public bool UseCentralPortal { get; set; }
+
+    /// <summary>
     /// 중앙 Identity 호스트의 OAuth를 사용하고 공용 쿠키만 소비하는 앱용 설정을 만듭니다.
     /// </summary>
     public AuthOptions AsConsumer() => new()
@@ -41,7 +46,8 @@ public sealed class AuthOptions
         CookieDomain = CookieDomain,
         CookieName = CookieName,
         DataProtectionKeysPath = DataProtectionKeysPath,
-        DataProtectionApplicationName = DataProtectionApplicationName
+        DataProtectionApplicationName = DataProtectionApplicationName,
+        UseCentralPortal = true
     };
 }
 

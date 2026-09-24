@@ -4,11 +4,13 @@ using Dreamine.Identity.Options;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -137,6 +139,46 @@ public sealed class DreamineIdentityExtensionsTests
 
         Assert.Equal(".Dreamine.Identity", cookies.Cookie.Name);
         Assert.Null(cookies.Cookie.Domain);
+    }
+
+    [Fact]
+    public async Task ConsumerCookieChallenge_RedirectsToCentralPortalAndPreservesReturnUrl()
+    {
+        var databasePath = Path.Combine(
+            Path.GetTempPath(),
+            "dreamine-identity-tests",
+            Guid.NewGuid().ToString("N"),
+            "identity.db");
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDreamineIdentityWeb(new AuthOptions().AsConsumer(), databasePath);
+
+        using var provider = services.BuildServiceProvider();
+        var cookies = provider
+            .GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+            .Get(CookieAuthenticationDefaults.AuthenticationScheme);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Scheme = "https";
+        httpContext.Request.Host = new HostString("game.codemaru.co.kr");
+        httpContext.Request.Path = "/play";
+        httpContext.Request.QueryString = new QueryString("?lang=ko");
+        var scheme = new AuthenticationScheme(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            null,
+            typeof(CookieAuthenticationHandler));
+        var redirectContext = new RedirectContext<CookieAuthenticationOptions>(
+            httpContext,
+            scheme,
+            cookies,
+            new AuthenticationProperties(),
+            "/_identity/login");
+
+        await cookies.Events.OnRedirectToLogin(redirectContext);
+
+        Assert.Equal(
+            "https://codemaru.co.kr/_identity/login?lang=ko&returnUrl="
+            + Uri.EscapeDataString("https://game.codemaru.co.kr/play?lang=ko"),
+            httpContext.Response.Headers.Location.ToString());
     }
 
     [Fact]

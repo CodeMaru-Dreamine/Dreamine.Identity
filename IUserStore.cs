@@ -16,6 +16,13 @@ public interface IUserStore
         string email,
         string displayName,
         string avatarUrl,
+        RegistrationConsent? registrationConsent = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>\brief 로그인 제공자와 제공자 식별자로 사용자를 조회합니다.</summary>
+    Task<AuthUser?> FindByProviderAsync(
+        string provider,
+        string providerKey,
         CancellationToken cancellationToken = default);
 
     /// <summary>\brief 내부 Id 로 사용자 조회.</summary>
@@ -39,6 +46,7 @@ public interface IUserStore
         string email,
         string displayName,
         string password,
+        RegistrationConsent registrationConsent,
         CancellationToken cancellationToken = default);
 
     /// <summary>\brief 이메일/비밀번호로 로컬 계정을 검증합니다.</summary>
