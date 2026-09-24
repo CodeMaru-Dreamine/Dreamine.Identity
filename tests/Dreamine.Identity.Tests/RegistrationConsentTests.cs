@@ -7,6 +7,17 @@ namespace Dreamine.Identity.Tests;
 public sealed class RegistrationConsentTests
 {
     [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("unsupported")]
+    public void UnsupportedConsentLanguageFallsBackToKorean(string? language)
+    {
+        var type = typeof(DreamineIdentityExtensions).Assembly.GetType("Dreamine.Identity.Internal.IdentityLocalization", true)!;
+        var method = type.GetMethod("Consent", BindingFlags.Static | BindingFlags.NonPublic, null, [typeof(string)], null)!;
+        Assert.Equal(method.Invoke(null, ["ko"]), method.Invoke(null, [language]));
+    }
+
+    [Theory]
     [InlineData(DateTimeKind.Utc)]
     [InlineData(DateTimeKind.Local)]
     [InlineData(DateTimeKind.Unspecified)]
